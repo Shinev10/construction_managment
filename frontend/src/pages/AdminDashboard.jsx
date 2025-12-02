@@ -1,145 +1,160 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-// CORRECTED Import Paths (Removed './')
-import projectService from '../api/projectService.js';
-import authService from '../api/authService.js';
+import projectService from '../api/projectService';
+import authService from '../api/authService';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:5000'); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+const socket = io('http://localhost:5000');
 
 // Helper function to format dates nicely
-const formatDateTime = (dateString) => { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  if (!dateString) return 'N/A'; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  return new Date(dateString).toLocaleDateString(undefined, options); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+const formatDateTime = (dateString) => {
+  if (!dateString) return 'N/A';
+  const options = { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
+  return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
-// Function to fetch managers (remains the same)
-const fetchManagers = async () => { /* ... (keep existing fetch function) ... */ // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    const token = localStorage.getItem('token'); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    if (!token) { console.error("No token"); return []; } // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+// Function to fetch managers
+const fetchManagers = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) { console.error("No token"); return []; }
     try {
-        const res = await fetch('http://localhost:5000/api/users/managers', { headers: { 'x-auth-token': token } }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-        if (!res.ok) { const errData = await res.json(); throw new Error(errData.msg || `Failed: ${res.status}`); } // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-        return await res.json(); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    } catch (err) { console.error("Fetch managers error:", err); alert(`Error: ${err.message}`); return []; } // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+        const res = await fetch('http://localhost:5000/api/users/managers', { headers: { 'x-auth-token': token } });
+        if (!res.ok) { const errData = await res.json(); throw new Error(errData.msg || `Failed: ${res.status}`); }
+        return await res.json();
+    } catch (err) { console.error("Fetch managers error:", err); alert(`Error: ${err.message}`); return []; }
 };
 
-const styles = { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  // Styles remain the same as the previous corrected version
-  pageWrapper: { padding: '0rem 0%', fontFamily: 'system-ui, sans-serif', width: '100%', boxSizing: 'border-box' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  dashboardLayout: { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    display: 'grid', gridTemplateColumns: '1fr', gap: '3rem', width: '100%', // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    marginTop: '2rem', padding: '0 5%', boxSizing: 'border-box', // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    // Media query would go in a CSS file or styled-components for proper implementation
-    // Simulating effect with logic below for now
+const styles = {
+  pageWrapper: { padding: '0rem 0%', fontFamily: 'system-ui, sans-serif', width: '100%', boxSizing: 'border-box' },
+  dashboardLayout: {
+    display: 'grid', gridTemplateColumns: '1fr', gap: '3rem', width: '100%',
+    marginTop: '2rem', padding: '0 5%', boxSizing: 'border-box',
   },
-   twoColumnLayout: { // Style object for two columns // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-       gridTemplateColumns: 'minmax(350px, 1.2fr) 2fr', // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+   twoColumnLayout: { 
+       gridTemplateColumns: 'minmax(350px, 1.2fr) 2fr',
    },
-  mainContentColumn: { display: 'flex', flexDirection: 'column', gap: '3rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  sidebarColumn: { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      position: 'sticky', top: '2rem', alignSelf: 'start', maxWidth: '450px', // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      // Media query simulation done via conditional style merge below
+  mainContentColumn: { display: 'flex', flexDirection: 'column', gap: '3rem' },
+  sidebarColumn: {
+      position: 'sticky', top: '2rem', alignSelf: 'start', maxWidth: '450px',
   },
-  welcomeMessage: { fontSize: '1.2rem', color: '#4a5568', marginBottom: '0.5rem', padding: '0 5%' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  title: { fontSize: '2rem', fontWeight: 'bold', color: '#1a202c', marginBottom: '2rem', padding: '0 5%' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  formContainer: { padding: '2rem', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  formTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  input: { width: '100%', padding: '0.85rem', marginBottom: '1rem', border: '1px solid #cbd5e0', borderRadius: '8px', boxSizing: 'border-box', fontSize: '1rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  select: { width: '100%', padding: '0.85rem', marginBottom: '1rem', border: '1px solid #cbd5e0', borderRadius: '8px', boxSizing: 'border-box', backgroundColor: 'white', appearance: 'none', backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%239ca3af" class="bi bi-chevron-down" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1em', fontSize: '1rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  label: { display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  button: { width: '100%', padding: '0.9rem 1.5rem', border: 'none', borderRadius: '8px', backgroundColor: '#f0b900', color: '#1a202c', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', marginTop: '0.5rem', transition: 'background-color 0.2s' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectListContainer: {}, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectListTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectList: { maxHeight: 'calc(50vh - 100px)', overflowY: 'auto', paddingRight: '1rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectItem: { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', transition: 'transform 0.2s, box-shadow 0.2s' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectItemHover: { transform: 'translateY(-4px)', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.1)' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectName: { fontSize: '1.3rem', fontWeight: '600', color: '#1a202c', marginBottom: '0.5rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  projectMeta: { color: '#4a5568', fontSize: '0.9rem', marginBottom: '0.3rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  link: { display: 'inline-block', marginTop: '1rem', fontWeight: 'bold', color: '#1a202c', textDecoration: 'none', fontSize: '0.9rem' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  inquiriesContainer: { padding: '2rem', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  inquiriesTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  inquiryTable: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  tableHeader: { borderBottom: '2px solid #e2e8f0', textAlign: 'left', padding: '0.75rem 0.5rem', color: '#6b7280', fontSize: '0.8rem', textTransform: 'uppercase' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  tableRow: { borderBottom: '1px solid #f1f5f9' }, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  tableCell: { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+  welcomeMessage: { fontSize: '1.2rem', color: '#4a5568', marginBottom: '0.5rem', padding: '0 5%' },
+  title: { fontSize: '2rem', fontWeight: 'bold', color: '#1a202c', marginBottom: '2rem', padding: '0 5%' },
+  formContainer: { padding: '2rem', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' },
+  formTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' },
+  input: { width: '100%', padding: '0.85rem', marginBottom: '1rem', border: '1px solid #cbd5e0', borderRadius: '8px', boxSizing: 'border-box', fontSize: '1rem' },
+  select: { width: '100%', padding: '0.85rem', marginBottom: '1rem', border: '1px solid #cbd5e0', borderRadius: '8px', boxSizing: 'border-box', backgroundColor: 'white', appearance: 'none', backgroundImage: `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%239ca3af" class="bi bi-chevron-down" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>')`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1em', fontSize: '1rem' },
+  label: { display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#374151', marginBottom: '0.5rem' },
+  button: { width: '100%', padding: '0.9rem 1.5rem', border: 'none', borderRadius: '8px', backgroundColor: '#f0b900', color: '#1a202c', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem', marginTop: '0.5rem', transition: 'background-color 0.2s' },
+  projectListContainer: {},
+  projectListTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' },
+  projectList: { maxHeight: 'calc(50vh - 100px)', overflowY: 'auto', paddingRight: '1rem' },
+  projectItem: { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)', transition: 'transform 0.2s, box-shadow 0.2s' },
+  projectItemHover: { transform: 'translateY(-4px)', boxShadow: '0 10px 20px rgba(0, 0, 0, 0.1)' },
+  projectName: { fontSize: '1.3rem', fontWeight: '600', color: '#1a202c', marginBottom: '0.5rem' },
+  projectMeta: { color: '#4a5568', fontSize: '0.9rem', marginBottom: '0.3rem' },
+  link: { display: 'inline-block', marginTop: '1rem', fontWeight: 'bold', color: '#1a202c', textDecoration: 'none', fontSize: '0.9rem' },
+  inquiriesContainer: { padding: '2rem', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)' },
+  inquiriesTitle: { fontSize: '1.5rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' },
+  inquiryTable: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
+  tableHeader: { borderBottom: '2px solid #e2e8f0', textAlign: 'left', padding: '0.75rem 0.5rem', color: '#6b7280', fontSize: '0.8rem', textTransform: 'uppercase' },
+  tableRow: { borderBottom: '1px solid #f1f5f9' },
+  tableCell: {
       padding: '1rem 0.5rem',
       verticalAlign: 'middle',
       wordBreak: 'break-word',
-      color: '#1a202c' // Explicitly set text color
+      color: '#1a202c' // Ensure text color is dark
   },
-  statusSelect: { padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e0', backgroundColor: 'white', fontSize: '0.9rem' } // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+  statusSelect: { padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #cbd5e0', backgroundColor: 'white', fontSize: '0.9rem' },
+  chatStateCell: { fontSize: '0.9rem', fontWeight: '500' },
+  chatStateAI: { color: '#1d4ed8' },
+  chatStateAdmin: { color: '#166534' },
 };
 
+const AdminDashboard = ({ user }) => {
+  const [projects, setProjects] = useState([]);
+  const [newProject, setNewProject] = useState({ name: '', description: '', startDate: '', endDate: '' });
+  const [managers, setManagers] = useState([]);
+  const [selectedManager, setSelectedManager] = useState('');
+  const [loadingManagers, setLoadingManagers] = useState(true);
+  const [inquiries, setInquiries] = useState([]);
+  const [loadingInquiries, setLoadingInquiries] = useState(true);
+  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth > 900);
 
-const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [projects, setProjects] = useState([]); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [newProject, setNewProject] = useState({ name: '', description: '', startDate: '', endDate: '' }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [managers, setManagers] = useState([]); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [selectedManager, setSelectedManager] = useState(''); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [loadingManagers, setLoadingManagers] = useState(true); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [inquiries, setInquiries] = useState([]); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [loadingInquiries, setLoadingInquiries] = useState(true); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const [isWideScreen, setIsWideScreen] = useState(window.innerWidth > 900); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-
-  useEffect(() => { /* Effect for screen resize */ // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      const handleResize = () => setIsWideScreen(window.innerWidth > 900); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      window.addEventListener('resize', handleResize); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      return () => window.removeEventListener('resize', handleResize); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+  useEffect(() => {
+      const handleResize = () => setIsWideScreen(window.innerWidth > 900);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Combined useEffect for data loading and WebSocket
-  useEffect(() => { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    let isMounted = true; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+  useEffect(() => {
+    let isMounted = true;
     // --- Fetch functions ---
-    const fetchProjects = async () => { try { const res = await projectService.getProjects(); if(isMounted) setProjects(res.data); } catch (error) { console.error('Failed fetch projects:', error); } }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    const loadManagers = async () => { setLoadingManagers(true); const fetched = await fetchManagers(); if(isMounted) { setManagers(fetched); if (fetched.length > 0) setSelectedManager(fetched[0]._id); setLoadingManagers(false); } }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    const fetchInquiries = async () => { setLoadingInquiries(true); try { const res = await authService.getInquiries(); if (isMounted) setInquiries(res.data); } catch (error) { console.error('Failed fetch inquiries:', error); if (isMounted && user?.role === 'admin') alert('Could not load inquiries.'); } finally { if (isMounted) setLoadingInquiries(false); } }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+    const fetchProjects = async () => { try { const res = await projectService.getProjects(); if(isMounted) setProjects(res.data); } catch (error) { console.error('Failed fetch projects:', error); } };
+    const loadManagers = async () => { setLoadingManagers(true); const fetched = await fetchManagers(); if(isMounted) { setManagers(fetched); if (fetched.length > 0) setSelectedManager(fetched[0]._id); setLoadingManagers(false); } };
+    const fetchInquiries = async () => { setLoadingInquiries(true); try { const res = await authService.getInquiries(); if (isMounted) setInquiries(res.data); } catch (error) { console.error('Failed fetch inquiries:', error); if (isMounted && user?.role === 'admin') alert('Could not load inquiries.'); } finally { if (isMounted) setLoadingInquiries(false); } };
+    
     // --- Initial Fetches ---
-    fetchProjects(); loadManagers(); fetchInquiries(); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+    fetchProjects(); loadManagers(); fetchInquiries();
+    
     // --- WebSocket Listeners ---
-    socket.on('project_created', (p) => { if(isMounted) setProjects((prev) => [p, ...prev]); }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    socket.on('new_inquiry', (i) => { if(isMounted) setInquiries((prev) => [i, ...prev]); }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    socket.on('inquiry_updated', (updInq) => { if(isMounted) setInquiries((prev) => prev.map(inq => inq._id === updInq._id ? updInq : inq)); }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+    socket.on('project_created', (p) => { if(isMounted) setProjects((prev) => [p, ...prev].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))); });
+    socket.on('new_inquiry', (i) => { if(isMounted) setInquiries((prev) => [i, ...prev].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))); });
+    
+    // Helper function to update inquiry list
+    const updateInquiryInList = (updatedInquiry) => {
+        if (isMounted) {
+            setInquiries((prev) => 
+                prev.map(inq => inq._id === updatedInquiry._id ? updatedInquiry : inq)
+                    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+            );
+        }
+    };
+    
+    // Listen for all inquiry updates
+    socket.on('inquiry_updated', updateInquiryInList);
+    socket.on('chat_taken_over', updateInquiryInList);
+    socket.on('inquiry_updated_realtime', updateInquiryInList);
+
     // --- Cleanup ---
-    return () => { isMounted = false; socket.off('project_created'); socket.off('new_inquiry'); socket.off('inquiry_updated'); }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  }, [user]); // Added user dependency // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+    return () => {
+      isMounted = false; 
+      socket.off('project_created');
+      socket.off('new_inquiry');
+      socket.off('inquiry_updated', updateInquiryInList);
+      socket.off('chat_taken_over', updateInquiryInList);
+      socket.off('inquiry_updated_realtime', updateInquiryInList);
+    };
+  }, [user]);
 
   // --- Handlers ---
-  const handleInputChange = (e) => setNewProject({ ...newProject, [e.target.name]: e.target.value }); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const handleManagerChange = (e) => setSelectedManager(e.target.value); // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const handleCreateProject = async (e) => { e.preventDefault(); if (!selectedManager) { alert("Please select manager."); return; } try { const d = { ...newProject, manager: selectedManager, team: [selectedManager] }; await projectService.createProject(d); setNewProject({ name: '', description: '', startDate: '', endDate: '' }); if (managers.length > 0) setSelectedManager(managers[0]._id); alert('Project created!'); } catch (err) { console.error('Create project error:', err); alert('Error: ' + (err.response?.data?.msg || 'Could not create.')); } }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-  const handleStatusChange = async (inquiryId, newStatus) => { const current = inquiries.find(i => i._id === inquiryId); if (current?.status === newStatus) return; try { setInquiries((prev) => prev.map(i => i._id === inquiryId ? { ...i, status: newStatus } : i)); await authService.updateInquiryStatus(inquiryId, newStatus); } catch (err) { console.error("Update status error:", err); alert("Update failed."); const fetchAgain = async () => { try { const res = await authService.getInquiries(); setInquiries(res.data); } catch { /* handle */ } }; fetchAgain(); } }; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+  const handleInputChange = (e) => setNewProject({ ...newProject, [e.target.name]: e.target.value });
+  const handleManagerChange = (e) => setSelectedManager(e.target.value);
+  const handleCreateProject = async (e) => { e.preventDefault(); if (!selectedManager) { alert("Please select manager."); return; } try { const d = { ...newProject, manager: selectedManager, team: [selectedManager] }; await projectService.createProject(d); setNewProject({ name: '', description: '', startDate: '', endDate: '' }); if (managers.length > 0) setSelectedManager(managers[0]._id); alert('Project created!'); } catch (err) { console.error('Create project error:', err); alert('Error: ' + (err.response?.data?.msg || 'Could not create.')); } };
+  const handleStatusChange = async (inquiryId, newStatus) => { const current = inquiries.find(i => i._id === inquiryId); if (current?.status === newStatus) return; try { setInquiries((prev) => prev.map(i => i._id === inquiryId ? { ...i, status: newStatus } : i)); await authService.updateInquiryStatus(inquiryId, newStatus); } catch (err) { console.error("Update status error:", err); alert("Update failed."); const fetchAgain = async () => { try { const res = await authService.getInquiries(); setInquiries(res.data); } catch { /* handle */ } }; fetchAgain(); } };
 
    // --- RENDER LOGIC ---
-   // Apply responsive grid layout style conditionally
-   const layoutStyle = { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      ...styles.dashboardLayout, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-      ...(isWideScreen ? styles.twoColumnLayout : {}), // Apply 2 columns if wide // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-       ...(!isWideScreen && { padding: '0 2rem'}) // Less padding on mobile? // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+   const layoutStyle = {
+      ...styles.dashboardLayout,
+      ...(isWideScreen ? styles.twoColumnLayout : {}),
+       ...(!isWideScreen && { padding: '0 2rem'})
    };
-   // Adjust sidebar style conditionally
-    const sidebarStyle = { // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-        ...styles.sidebarColumn, // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-        ...(!isWideScreen && { position: 'static', maxWidth: 'none' }) // Override sticky/max-width on small screens // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+    const sidebarStyle = {
+        ...styles.sidebarColumn,
+        ...(!isWideScreen && { position: 'static', maxWidth: 'none' })
     };
 
-  return ( // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-    // Removed outer pageWrapper div
+  return (
     <div> 
-      {/* Apply padding directly to title/welcome or keep in parent */}
       <h2 style={styles.title}>Admin Dashboard</h2>
       <p style={styles.welcomeMessage}>Welcome, {user.name}!</p>
 
-      {/* dashboardLayout now applies padding and responsive columns */}
       <div style={layoutStyle}> 
         {/* --- Sidebar Column (Form) --- */}
         <div style={sidebarStyle}>
            <div style={styles.formContainer}>
             <h3 style={styles.formTitle}>Create New Project</h3>
             <form onSubmit={handleCreateProject}>
-              {/* --- CORRECTED Form Inputs --- */}
                <div>
                  <label htmlFor="projectName" style={styles.label}>Project Name</label>
                  <input id="projectName" type="text" name="name" value={newProject.name} onChange={handleInputChange} style={styles.input} required />
@@ -156,8 +171,6 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
                   <label htmlFor="endDate" style={styles.label}>End Date</label>
                  <input id="endDate" type="date" name="endDate" value={newProject.endDate} onChange={handleInputChange} style={styles.input} required />
                </div>
-
-              {/* Manager Select Dropdown */}
               <div>
                 <label htmlFor="managerSelect" style={styles.label}>Assign Manager:</label>
                 <select
@@ -173,7 +186,6 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
                   }
                 </select>
               </div>
-
               <button type="submit" style={styles.button}>Create Project</button>
             </form>
           </div>
@@ -203,10 +215,13 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
               </div>
             </div>
 
-            {/* Inquiries Section */}
+          {/* Inquiries Section */}
              <div style={styles.inquiriesContainer}>
                 <h3 style={styles.inquiriesTitle}>Client Inquiries</h3>
-                {loadingInquiries ? <p>Loading inquiries...</p> : (
+                
+                {loadingInquiries ? (
+                    <p style={{ color: '#4a5568' }}>Loading inquiries...</p> 
+                ) : (
                     inquiries.length > 0 ? (
                         <div style={{overflowX: 'auto'}}> 
                             <table style={styles.inquiryTable}>
@@ -216,17 +231,17 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
                                         <th style={{...styles.tableHeader, width: '25%'}}>Offering Type</th>
                                         <th style={{...styles.tableHeader, width: '20%'}}>Submitted</th>
                                         <th style={{...styles.tableHeader, width: '15%'}}>Status</th>
-                                        <th style={{...styles.tableHeader, width: '10%'}}>Action</th> {/* <-- ADDED THIS */}
+                                        <th style={{...styles.tableHeader, width: '10%'}}>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {inquiries.map(inq => ( // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+                                    {inquiries.map(inq => (
                                         <tr key={inq._id} style={styles.tableRow}>
                                             <td style={styles.tableCell}>{inq.client?.name || 'N/A'} ({inq.client?.email || 'N/A'})</td>
                                             <td style={styles.tableCell}>{inq.offeringType}</td>
                                             <td style={styles.tableCell}>{formatDateTime(inq.createdAt)}</td>
                                             <td style={styles.tableCell}>
-                                                <select // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+                                                <select
                                                     value={inq.status}
                                                     onChange={(e) => handleStatusChange(inq._id, e.target.value)}
                                                     style={styles.statusSelect}
@@ -237,17 +252,15 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
                                                     <option value="Project Created">Project Created</option>
                                                 </select>
                                             </td>
-
-                                            {/* ADDED THIS NEW TABLE CELL FOR THE CHAT LINK */}
                                             <td style={styles.tableCell}>
-                                                {inq.client?._id ? ( // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+                                                {inq.client?._id ? (
                                                     <Link 
                                                         to={`/chat/${inq.client._id}`} 
                                                         style={{...styles.link, marginTop: 0, fontSize: '0.9rem'}}
                                                     >
                                                         Chat
                                                     </Link>
-                                                ) : ( // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
+                                                ) : (
                                                     <span style={{fontSize: '0.9rem', color: '#999'}}>N/A</span>
                                                 )}
                                             </td>
@@ -257,7 +270,9 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
                             </table>
                         </div>
                     ) : (
-                        <p>No new inquiries found.</p>
+                        <p style={{ color: '#4a5568', fontStyle: 'italic', padding: '1rem 0' }}>
+                            No new inquiries found.
+                        </p>
                     )
                 )}
              </div>
@@ -267,5 +282,4 @@ const AdminDashboard = ({ user }) => { // [cite: uploaded:shinev10/construction_
   );
 };
 
-export default AdminDashboard; // [cite: uploaded:shinev10/construction_managment/construction_managment-bb03423c5646cb45e0f1d17b7a57e9983bc82509/frontend/src/pages/AdminDashboard.jsx]
-
+export default AdminDashboard;

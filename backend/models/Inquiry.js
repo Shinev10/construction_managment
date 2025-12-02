@@ -7,28 +7,36 @@ const inquirySchema = new Schema({
     ref: 'User',
     required: true,
   },
-  offeringType: { // e.g., "₹50 Lakh Range"
+  offeringType: { // e.g., "The Compact (2BHK Apartment)"
     type: String,
     required: true,
   },
   status: {
     type: String,
-    enum: ['New', 'Viewed', 'Contacted', 'Project Created'],
+    enum: ['New', 'Viewed', 'Contacted', 'Project Created', 'Closed'],
     default: 'New',
   },
-  conversationId: { // Link to the chat conversation
-    type: String, 
-    required: false,
-    default: null,
+  
+  // --- NEW FIELDS FOR AI/ADMIN CHAT ---
+  chatState: {
+    type: String,
+    enum: ['ai', 'admin'],
+    default: 'ai', // Start with AI
   },
+  assignedAdmin: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: null, // No admin assigned initially
+  },
+  // --- END OF NEW FIELDS ---
+
   createdAt: { // Ensures the timestamp is always saved
     type: Date,
     default: Date.now,
   }
 }, {
-  timestamps: false, // Set to false since we define createdAt manually
+  timestamps: true, // Use timestamps to track last update (for sorting)
 });
 
-// --- CRITICAL FIX: The Model MUST be registered and exported correctly ---
-// This line creates the 'Inquiry' model from the schema.
 module.exports = mongoose.model('Inquiry', inquirySchema);
+

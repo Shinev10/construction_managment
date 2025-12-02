@@ -4,181 +4,186 @@ const cors = require('cors');
 require('dotenv').config();
 const http = require('http');
 const { Server } = require("socket.io");
+const path = require('path');
+const fs = require('fs');
 
 // Import models
-const Message = require('./models/Message'); // Existing project messages
+const Message = require('./models/Message');
 const User = require('./models/User');
-const DirectMessage = require('./models/DirectMessage'); // 1. IMPORT: For direct messages
-const Conversation = require('./models/Conversation'); // 2. IMPORT: For tracking conversations
+// Ensure these files exist in backend/models/
+const InquiryMessage = require('./models/InquiryMessage'); 
+const Inquiry = require('./models/Inquiry');
+
+// Ensure aiResponder exists in backend/ai/
+const { getCustomAIResponse, shouldHandoff } = require('./ai/aiResponder');
 
 const app = express();
 
 // Middleware
-app.use(cors()); //
-app.use(express.json()); //
+app.use(cors());
+app.use(express.json());
 
-// Create HTTP server FROM the Express app
-const server = http.createServer(app); //
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir);
+}
+app.use('/uploads', express.static(uploadsDir));
 
-// Initialize Socket.IO server and attach it to the HTTP server
-const io = new Server(server, { //
-  cors: { //
-    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"], // Adjust origins as needed //
-    methods: ["GET", "POST"] //
+// Create HTTP server
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"], // Add your frontend URLs
+    methods: ["GET", "POST"]
   }
 });
 
-// Middleware to make io accessible in routes
-app.use((req, res, next) => { //
-  req.io = io; //
-  next(); //
+// Make io accessible in routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
 });
 
 // Routes
-const authRoutes = require('./routes/auth'); //
-const projectRoutes = require('./routes/projects'); //
-const userRoutes = require('./routes/userRoutes'); //
-const inquiryRoutes = require('./routes/inquiries'); //
-const chatRoutes = require('./routes/chatRoutes'); // 3. IMPORT: New chat routes
+const authRoutes = require('./routes/auth');
+const projectRoutes = require('./routes/projects');
+const userRoutes = require('./routes/userRoutes');
+const inquiryRoutes = require('./routes/inquiries');
 
-app.use('/api/auth', authRoutes); //
-app.use('/api/projects', projectRoutes); //
-app.use('/api/users', userRoutes); //
-app.use('/api/inquiries', inquiryRoutes); //
-app.use('/api/chat', chatRoutes); // 4. USE: New chat routes
+app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/inquiries', inquiryRoutes);
 
-// Root test route
-app.get('/', (req, res) => { //
-  res.send('Backend is running 👍'); //
+app.get('/', (req, res) => {
+  res.send('Backend is running 👍');
 });
 
+// WebSocket connection
+io.on('connection', (socket) => {
+  console.log(`✅ User Connected: ${socket.id}`);
 
-// WebSocket connection logic
-io.on('connection', (socket) => { //
-  console.log(`✅ User Connected: ${socket.id}`); //
-
-  // --- For Project Chat ---
-  socket.on('join_project_room', (projectId) => { //
-     console.log(`[Socket ${socket.id}] User attempting to join PROJECT room ${projectId}`); //
-     try {
-         socket.join(projectId); // Join the room //
-         console.log(`[Socket ${socket.id}] User successfully joined PROJECT room ${projectId}`); //
-     } catch (joinError) {
-          console.error(`[Socket ${socket.id}] Error joining PROJECT room ${projectId}:`, joinError); //
-     }
-  });
-
-  socket.on('send_message', async (data) => { //
-    // ... (keep existing project message handling code) ...
-    const { projectId, senderId, content } = data; //
-    console.log(`[Socket ${socket.id}] Received 'send_message' for project ${projectId}`); //
-    try { //
-        console.log(` -> Data: Sender=${senderId}, Content="${content}"`); //
-
-        console.log(` -> Saving message to DB...`); //
-        const message = new Message({ project: projectId, sender: senderId, content }); //
-        await message.save(); //
-        console.log(` -> Message saved successfully (ID: ${message._id}).`); //
-
-        console.log(` -> Populating sender info...`); //
-        const fullMessage = await Message.findById(message._id).populate('sender', 'name'); //
-        if (!fullMessage) { //
-            console.error(` -> Failed to find message ${message._id} after saving.`); //
-            throw new Error('Failed to retrieve message after saving'); //
-        } //
-        console.log(` -> Sender info populated.`); //
-
-        console.log(` -> Broadcasting 'receive_message' to room ${projectId}...`); //
-        io.to(projectId).emit('receive_message', fullMessage); //
-        console.log(` -> Broadcast complete for room ${projectId}.`); //
-
-    } catch(err) { //
-        console.error(`[Socket ${socket.id}] Error processing 'send_message' for project ${projectId}:`, err); //
-    } //
-  });
-
-  // --- 5. ADDED: For Direct Chat (Admin <-> Client) ---
-  socket.on('join_dm_room', (conversationId) => {
-    console.log(`[Socket ${socket.id}] User joining DIRECT MESSAGE room ${conversationId}`);
+  // --- Project chat rooms ---
+  socket.on('join_project_room', (projectId) => {
+    console.log(`[Socket ${socket.id}] User joining PROJECT room ${projectId}`);
     try {
-      socket.join(conversationId);
-      console.log(`[Socket ${socket.id}] User successfully joined DIRECT MESSAGE room ${conversationId}`);
-    } catch (joinError) {
-      console.error(`[Socket ${socket.id}] Error joining DIRECT MESSAGE room ${conversationId}:`, joinError);
+      socket.join(projectId);
+      console.log(`[Socket ${socket.id}] Joined PROJECT room ${projectId}`);
+    } catch (err) {
+      console.error(`[Socket ${socket.id}] Error joining project room:`, err);
     }
   });
 
-  // --- 6. ADDED: Handle sending a direct message ---
-  socket.on('send_dm', async (data) => {
-    const { conversationId, senderId, content } = data;
-    console.log(`[Socket ${socket.id}] Received 'send_dm' for conversation ${conversationId}`);
+  socket.on('send_message', async (data) => {
+    const { projectId, senderId, content } = data;
     try {
-      if (!mongoose.Types.ObjectId.isValid(conversationId) || !mongoose.Types.ObjectId.isValid(senderId)) {
-          console.error(` -> Invalid ID format received. Convo: ${conversationId}, Sender: ${senderId}`);
-          return; // Stop processing if IDs are invalid
-      }
-      if (!content || typeof content !== 'string' || content.trim().length === 0) {
-          console.error(` -> Invalid or empty message content received.`);
-          return; // Stop processing if content is bad
-      }
-
-      console.log(` -> DM Data: Sender=${senderId}, Content="${content}"`);
-
-      console.log(` -> Saving DM to DB...`);
-      const message = new DirectMessage({
-        conversation: conversationId,
-        sender: senderId,
-        content: content,
-      });
+      const message = new Message({ project: projectId, sender: senderId, content });
       await message.save();
-      console.log(` -> DM saved successfully (ID: ${message._id}).`);
-
-      // Update conversation timestamp
-      await Conversation.findByIdAndUpdate(conversationId, { updatedAt: Date.now() });
-      console.log(` -> Conversation ${conversationId} timestamp updated.`);
-
-      console.log(` -> Populating DM sender info...`);
-      const fullMessage = await DirectMessage.findById(message._id)
-                                    .populate('sender', 'name role'); // Populate relevant sender details
-      if (!fullMessage) {
-        console.error(` -> Failed to find DM ${message._id} after saving.`);
-        throw new Error('Failed to retrieve direct message after saving');
-      }
-      console.log(` -> DM Sender info populated.`);
-
-      console.log(` -> Broadcasting 'receive_dm' to room ${conversationId}...`);
-      io.to(conversationId).emit('receive_dm', fullMessage);
-      console.log(` -> DM Broadcast complete for room ${conversationId}.`);
-
-    } catch(err) {
-      console.error(`[Socket ${socket.id}] Error processing 'send_dm' for conversation ${conversationId}:`, err);
-      // Maybe emit an error back to the sender?
-      // socket.emit('dm_error', { error: 'Failed to send direct message', details: err.message });
+      const fullMessage = await Message.findById(message._id).populate('sender', 'name');
+      io.to(projectId).emit('receive_message', fullMessage);
+    } catch (err) {
+      console.error(`[Socket ${socket.id}] Error sending project message:`, err);
     }
   });
-  // --- End Direct Chat Additions ---
 
-  socket.on('disconnect', () => { //
-     console.log(`❌ User Disconnected: ${socket.id}`); //
+  // --- Inquiry chat ---
+  socket.on('join_inquiry_room', (inquiryId) => {
+    console.log(`[Socket ${socket.id}] User joining INQUIRY room ${inquiryId}`);
+    try {
+      socket.join(inquiryId);
+    } catch (err) {
+      console.error(`[Socket ${socket.id}] Error joining inquiry room:`, err);
+    }
   });
 
-  socket.on('connect_error', (err) => { //
-     console.error(`[Socket ${socket.id}] Connection Error: ${err.message}`); //
+  socket.on('send_inquiry_message', async (data) => {
+    const { inquiryId, senderId, content } = data;
+
+    if (!mongoose.Types.ObjectId.isValid(inquiryId) || (senderId && !mongoose.Types.ObjectId.isValid(senderId))) {
+      console.error(`[Socket ${socket.id}] Invalid IDs for send_inquiry_message`);
+      return;
+    }
+
+    try {
+      // Save user message
+      const userMessage = new InquiryMessage({
+        inquiry: inquiryId,
+        sender: senderId,
+        senderType: 'user', // Or 'admin' if senderId is an admin
+        content,
+      });
+      await userMessage.save();
+      
+      const populatedUserMessage = await InquiryMessage.findById(userMessage._id).populate('sender', 'name role');
+      io.to(inquiryId).emit('receive_inquiry_message', populatedUserMessage);
+
+      // Update inquiry activity
+      const inquiry = await Inquiry.findByIdAndUpdate(inquiryId, { updatedAt: Date.now() }, { new: true })
+        .populate('client', 'name email')
+        //.populate('assignedAdmin', 'name'); // Ensure this field exists in your Inquiry model
+
+      if (!inquiry) return;
+      
+      // Notify admins about the update (optional, requires admin room logic)
+      // io.to('admin_room').emit('inquiry_updated_realtime', inquiry); 
+
+      // Trigger AI if chatState is 'ai' and user is client
+      // We need to fetch the sender to check their role
+      const senderUser = await User.findById(senderId);
+      
+      if (inquiry.chatState === 'ai' && senderUser && senderUser.role === 'client') {
+        console.log(`[Socket ${socket.id}] Message from client in AI mode. Getting AI response...`);
+
+        const aiResponseText = getCustomAIResponse(content); 
+        
+        const aiMessage = new InquiryMessage({
+          inquiry: inquiryId,
+          sender: null,
+          senderType: 'ai',
+          content: aiResponseText,
+        });
+        await aiMessage.save();
+
+        io.to(inquiryId).emit('receive_inquiry_message', aiMessage);
+
+        // Check for handoff trigger
+        if (shouldHandoff(aiResponseText)) {
+          console.log(`[Socket ${socket.id}] AI triggered handoff for inquiry ${inquiryId}`);
+          inquiry.chatState = 'admin';
+          await inquiry.save();
+
+          const populatedHandoff = await Inquiry.findById(inquiry._id)
+            .populate('client', 'name email')
+            //.populate('assignedAdmin', 'name');
+            
+          io.to(inquiryId).emit('chat_taken_over', populatedHandoff);
+        }
+      }
+    } catch (err) {
+      console.error(`[Socket ${socket.id}] Error processing 'send_inquiry_message':`, err);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`❌ User Disconnected: ${socket.id}`);
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error(`[Socket ${socket.id}] Connection Error: ${err.message}`);
   });
 });
 
 // MongoDB connection
-mongoose.connect(process.env.MONGO_URI) //
-  .then(() => { //
-    console.log('✅ MongoDB connected successfully'); //
-
-    // Start the server using server.listen
-    const PORT = process.env.PORT || 5000; //
-    server.listen(PORT, () => { //
-      console.log(`🚀 Server running on port ${PORT}`); //
-    });
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log('✅ MongoDB connected successfully');
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
   })
-  .catch((err) => { //
-    console.error('❌ MongoDB connection failed:', err.message); //
-    process.exit(1); //
+  .catch((err) => {
+    console.error('❌ MongoDB connection failed:', err.message);
+    process.exit(1);
   });

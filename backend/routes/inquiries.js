@@ -1,132 +1,160 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
-const Inquiry = require('../models/Inquiry'); // Import the Inquiry model defined elsewhere
-const User = require('../models/User'); // Import User model to check roles and populate data
+const Inquiry = require('../models/Inquiry');
+const InquiryMessage = require('../models/InquiryMessage');
+const User = require('../models/User');
+const { getCustomAIResponse } = require('../ai/aiResponder');
 
-// @route   POST /api/inquiries
-// @desc    Submit a new client inquiry
-// @access  Private (Client only, technically any logged-in user can, but UI restricts)
+// =============================================
+// POST /api/inquiries
+// Submit a new client inquiry
+// =============================================
 router.post('/', authMiddleware, async (req, res) => {
   const { offeringType } = req.body;
-  const clientId = req.user.id; // Get client ID from the authenticated token
+  const clientId = req.user.id;
 
   if (!offeringType) {
     return res.status(400).json({ msg: 'Offering type is required.' });
   }
 
   try {
-    // Optional: Check if the user is actually a client
-    const clientUser = await User.findById(clientId);
-    if (!clientUser /* || clientUser.role !== 'client' */) { // You could enforce client role here if needed
-        return res.status(404).json({ msg: 'User not found or invalid role.' });
-    }
-
-    // Create new inquiry instance
     const newInquiry = new Inquiry({
       client: clientId,
-      offeringType: offeringType,
-      status: 'New', // Default status
-      // createdAt is handled by default: Date.now in the model
+      offeringType,
+      status: 'New',
+      chatState: 'ai',
     });
 
-    // Save the inquiry to the database
     const savedInquiry = await newInquiry.save();
 
-    // Populate client info for potential real-time update
-    const populatedInquiry = await Inquiry.findById(savedInquiry._id).populate('client', 'name email');
+    // Auto AI reply
+    const aiResponseText = getCustomAIResponse(offeringType);
 
-    // Emit a socket event to notify admins (if req.io is attached)
-    if (req.io) {
-      req.io.emit('new_inquiry', populatedInquiry);
-      console.log("Emitted new_inquiry event");
-    } else {
-        console.warn("Socket.io (req.io) not available on request object. Cannot emit 'new_inquiry'.");
-    }
+    const aiMessage = new InquiryMessage({
+      inquiry: savedInquiry._id,
+      sender: null,
+      senderType: 'ai',
+      content: aiResponseText,
+    });
 
-    // Send success response back to the client
-    res.status(201).json({ msg: 'Inquiry submitted successfully!', inquiry: populatedInquiry });
+    await aiMessage.save();
+
+    const populatedInquiry = await Inquiry.findById(savedInquiry._id)
+      .populate('client', 'name email');
+
+    if (req.io) req.io.emit('new_inquiry', populatedInquiry);
+
+    res.status(201).json({
+      msg: 'Inquiry submitted successfully.',
+      inquiry: populatedInquiry,
+    });
 
   } catch (err) {
-    console.error("Error submitting inquiry:", err.message);
+    console.error('Error submitting inquiry:', err.message);
     res.status(500).send('Server Error');
   }
 });
 
-// @route   GET /api/inquiries
-// @desc    Get all inquiries (for Admin)
-// @access  Private (Admin only)
+// =============================================
+// GET /api/inquiries
+// Admin → gets ALL inquiries
+// Normal user → gets ONLY their inquiries
+// =============================================
 router.get('/', authMiddleware, async (req, res) => {
-    try {
-        // 1. Verify user is an admin
-        const adminUser = await User.findById(req.user.id);
-        if (!adminUser || adminUser.role !== 'admin') {
-            return res.status(403).json({ msg: 'Access denied. Admins only.' });
-        }
+  try {
+    if (req.user.role === 'admin') {
+      const inquiries = await Inquiry.find()
+        .populate('client', 'name email')
+        .sort({ updatedAt: -1 });
 
-        // 2. Fetch all inquiries, populate client details, sort by newest first
-        const inquiries = await Inquiry.find()
-            .populate('client', 'name email') // Get name and email of the client
-            .sort({ createdAt: -1 }); // Show newest inquiries first
-
-        res.json(inquiries);
-
-    } catch (err) {
-        console.error("Error fetching inquiries:", err.message);
-        res.status(500).send('Server Error');
+      return res.json(inquiries);
     }
+
+    // Normal user
+    const inquiries = await Inquiry.find({ client: req.user.id })
+      .populate('client', 'name email')
+      .sort({ updatedAt: -1 });
+
+    res.json(inquiries);
+
+  } catch (err) {
+    console.error('Error fetching inquiries:', err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
 });
 
-// @route   PUT /api/inquiries/:inquiryId/status
-// @desc    Update the status of an inquiry
-// @access  Private (Admin only)
-router.put('/:inquiryId/status', authMiddleware, async (req, res) => {
-    const { status } = req.body;
-    const { inquiryId } = req.params;
+// =============================================
+// PUT /api/inquiries/:id/status
+// Admin changes inquiry status
+// =============================================
+router.put('/:id/status', authMiddleware, async (req, res) => {
+  try {
+    const inquiry = await Inquiry.findById(req.params.id);
+    if (!inquiry) return res.status(404).json({ msg: 'Inquiry not found' });
 
-    // Basic validation
-    const allowedStatuses = ['New', 'Viewed', 'Contacted', 'Project Created'];
-    if (!status || !allowedStatuses.includes(status)) {
-        return res.status(400).json({ msg: 'Invalid or missing status provided.' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(inquiryId)) {
-        return res.status(400).json({ msg: 'Invalid Inquiry ID format.' });
-    }
+    inquiry.status = req.body.status;
+    inquiry.updatedAt = Date.now();
 
-    try {
-        // 1. Verify user is an admin
-        const adminUser = await User.findById(req.user.id);
-        if (!adminUser || adminUser.role !== 'admin') {
-            return res.status(403).json({ msg: 'Access denied. Admins only.' });
-        }
+    await inquiry.save();
 
-        // 2. Find the inquiry
-        const inquiry = await Inquiry.findById(inquiryId);
-        if (!inquiry) {
-            return res.status(404).json({ msg: 'Inquiry not found.' });
-        }
+    // <-- FIXED LINE: use findById to fetch populated result
+    const updatedInquiry = await Inquiry.findById(req.params.id)
+      .populate('client', 'name email');
 
-        // 3. Update the status
-        inquiry.status = status;
-        const updatedInquiry = await inquiry.save();
+    if (req.io) req.io.emit('inquiry_updated', updatedInquiry);
 
-        // Populate for socket emission
-         const populatedInquiry = await Inquiry.findById(updatedInquiry._id).populate('client', 'name email');
+    res.json(updatedInquiry);
 
-
-        // Emit event to potentially update UI elsewhere (optional)
-        if (req.io) {
-            req.io.emit('inquiry_updated', populatedInquiry);
-            console.log(`Emitted inquiry_updated event for ${inquiryId}`);
-        }
-
-        res.json(populatedInquiry);
-
-    } catch (err) {
-        console.error("Error updating inquiry status:", err.message);
-        res.status(500).send('Server Error');
-    }
+  } catch (err) {
+    console.error('Update status error:', err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
 });
 
+// =============================================
+// PUT /api/inquiries/:id/takeover
+// Admin takes over the chat from AI
+// =============================================
+router.put('/:id/takeover', authMiddleware, async (req, res) => {
+  try {
+    const inquiry = await Inquiry.findById(req.params.id);
+    if (!inquiry) return res.status(404).json({ msg: 'Inquiry not found' });
+
+    inquiry.chatState = 'admin';
+    inquiry.updatedAt = Date.now();
+
+    await inquiry.save();
+
+    const updatedInquiry = await Inquiry.findById(req.params.id)
+      .populate('client', 'name email');
+
+    if (req.io) req.io.emit('chat_taken_over', updatedInquiry);
+
+    res.json(updatedInquiry);
+
+  } catch (err) {
+    console.error('Error taking over chat:', err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
+
+// =============================================
+// GET /api/inquiries/:id/messages
+// Get all messages for a specific inquiry
+// =============================================
+router.get('/:id/messages', authMiddleware, async (req, res) => {
+  try {
+    const messages = await InquiryMessage.find({ inquiry: req.params.id })
+      .populate('sender', 'name email')
+      .sort({ createdAt: 1 });
+
+    res.json(messages);
+
+  } catch (err) {
+    console.error('Error fetching messages:', err.message);
+    res.status(500).json({ msg: 'Server Error' });
+  }
+});
 
 module.exports = router;
