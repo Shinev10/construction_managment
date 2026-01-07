@@ -63,10 +63,8 @@ const Navbar = () => {
         </div>
       </Link>
       <div style={styles.navLinks}>
+        {/* Only Services remains */}
         <Link to="/services" style={styles.link}>Services</Link>
-        <Link to="/about" style={styles.link}>About</Link>
-        <Link to="/pricing" style={styles.link}>Pricing</Link>
-        <Link to="/chat-ai" style={styles.link}>Chat with AI</Link>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <Link to="/login" style={styles.link}>LOGIN</Link>
@@ -80,4 +78,3 @@ const Navbar = () => {
 };
 
 export default Navbar;
-

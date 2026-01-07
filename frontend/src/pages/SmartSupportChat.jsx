@@ -104,7 +104,7 @@ const SmartSupportChat = () => {
     // --- MODE 2: AI CHAT ---
     try {
       // Replace with your real API Key
-      const apiKey = "AIzaSyC9_UhoLB85L-T4eZwHPWe8Z6zPJY7Urcs"; 
+      const apiKey = "AIzaSyBcKlFcAKXfJ8Bjj4hmqeydkY5ziEf4frw"; 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

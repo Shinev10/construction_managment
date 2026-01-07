@@ -1,15 +1,12 @@
-html, body, #root {
-  height: 100%;
+#root {
+  width: 100%;
+  min-height: 100vh;
+  /* REMOVED: text-align: center; */
   margin: 0;
   padding: 0;
 }
 
-#root {
-  width: 100%;
-  min-height: 100vh;
-  text-align: center;
-}
-
+/* Keep the existing logo styles below */
 .logo {
   height: 6em;
   padding: 1.5em;
